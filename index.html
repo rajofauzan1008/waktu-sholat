@@ -812,8 +812,43 @@ function calcDistance(lat1, lng1, lat2, lng2) { const dLat = (lat2 - lat1) * Mat
 function updateQibla() { const deg = calcQibla(STATE.lat, STATE.lng); document.getElementById('qiblaDegree').textContent = `${Math.round(deg)}°`; document.getElementById('compassNeedle').style.transform = `translate(-50%, -100%) rotate(${deg}deg)`; document.getElementById('distanceKaabah').textContent = `${Math.round(calcDistance(STATE.lat, STATE.lng, 21.4225, 39.8262)).toLocaleString('id-ID')} km`; }
 
 function refreshLocation() {
-  document.getElementById('locationText').textContent = 'Mendeteksi...';
-  if ('geolocation' in navigator) navigator.geolocation.getCurrentPosition(async pos => { STATE.lat = pos.coords.latitude; STATE.lng = pos.coords.longitude; fetchPrayerTimes(); updateQibla(); document.getElementById('locationText').textContent = `${STATE.lat.toFixed(3)}, ${STATE.lng.toFixed(3)}`; });
+  document.getElementById('locationText').textContent = 'Mendeteksi kota...';
+  
+  if ('geolocation' in navigator) {
+    navigator.geolocation.getCurrentPosition(async pos => {
+      STATE.lat = pos.coords.latitude;
+      STATE.lng = pos.coords.longitude;
+      
+      // Update jadwal sholat dan arah kiblat berdasarkan koordinat baru
+      fetchPrayerTimes(); 
+      updateQibla(); 
+      
+      // Mengubah koordinat menjadi nama kota menggunakan BigDataCloud API
+      try {
+        const response = await fetch(`https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${STATE.lat}&longitude=${STATE.lng}&localityLanguage=id`);
+        const data = await response.json();
+        
+        // Coba ambil nama kota, jika tidak ada ambil nama daerah/provinsi
+        const cityName = data.city || data.locality || data.principalSubdivision || "Lokasi Ditemukan";
+        STATE.city = cityName;
+        
+        // Tampilkan nama kota di header dan halaman pengaturan
+        document.getElementById('locationText').textContent = cityName;
+        
+        const settingLocText = document.getElementById('settingLocationText');
+        if (settingLocText) settingLocText.textContent = cityName;
+        
+      } catch (error) {
+        // Fallback: Jika internet lambat atau API gagal, tampilkan koordinat lagi
+        document.getElementById('locationText').textContent = `${STATE.lat.toFixed(3)}, ${STATE.lng.toFixed(3)}`;
+      }
+      
+    }, error => {
+      document.getElementById('locationText').textContent = 'Akses lokasi ditolak';
+    });
+  } else {
+    document.getElementById('locationText').textContent = 'Fitur lokasi tidak didukung';
+  }
 }
 
 function showPage(name, btn) {
