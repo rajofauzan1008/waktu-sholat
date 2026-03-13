@@ -810,8 +810,61 @@ function switchCalView(view, btn) { STATE.calView = view; document.querySelector
 
 function calcQibla(lat, lng) { const KAABAH_LAT = 21.4225, KAABAH_LNG = 39.8262; const dLng = (KAABAH_LNG - lng) * Math.PI / 180; const lat1 = lat * Math.PI / 180; const lat2 = KAABAH_LAT * Math.PI / 180; const y = Math.sin(dLng) * Math.cos(lat2); const x = Math.cos(lat1) * Math.sin(lat2) - Math.sin(lat1) * Math.cos(lat2) * Math.cos(dLng); return (Math.atan2(y, x) * 180 / Math.PI + 360) % 360; }
 function calcDistance(lat1, lng1, lat2, lng2) { const dLat = (lat2 - lat1) * Math.PI / 180; const dLng = (lng2 - lng1) * Math.PI / 180; const a = Math.sin(dLat/2) ** 2 + Math.cos(lat1 * Math.PI/180) * Math.cos(lat2 * Math.PI/180) * Math.sin(dLng/2) ** 2; return 6371 * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a)); }
-function updateQibla() { const deg = calcQibla(STATE.lat, STATE.lng); document.getElementById('qiblaDegree').textContent = `${Math.round(deg)}°`; document.getElementById('compassNeedle').style.transform = `translate(-50%, -100%) rotate(${deg}deg)`; document.getElementById('distanceKaabah').textContent = `${Math.round(calcDistance(STATE.lat, STATE.lng, 21.4225, 39.8262)).toLocaleString('id-ID')} km`; }
+function updateQibla() { 
+  const deg = calcQibla(STATE.lat, STATE.lng); 
+  document.getElementById('qiblaDegree').textContent = `${Math.round(deg)}°`; 
+  
+  // Posisi awal jarum kiblat dikunci relatif terhadap cincin kompas (Utara)
+  document.getElementById('compassNeedle').style.transform = `translate(-50%, -100%) rotate(${deg}deg)`; 
+  document.getElementById('distanceKaabah').textContent = `${Math.round(calcDistance(STATE.lat, STATE.lng, 21.4225, 39.8262)).toLocaleString('id-ID')} km`; 
+}
 
+// Fungsi baru untuk meminta izin dan menyalakan sensor kompas
+function startCompass() {
+  if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
+    // Penanganan khusus untuk iOS 13+ (Apple mewajibkan request permission)
+    DeviceOrientationEvent.requestPermission()
+      .then(permissionState => {
+        if (permissionState === 'granted') {
+          window.addEventListener('deviceorientation', handleOrientation);
+          document.getElementById('btnCompass').style.display = 'none'; // Sembunyikan tombol
+        } else {
+          alert('Izin akses kompas ditolak. Buka pengaturan browser Anda.');
+        }
+      })
+      .catch(console.error);
+  } else {
+    // Penanganan untuk Android dan OS lainnya
+    if ('ondeviceorientationabsolute' in window) {
+      window.addEventListener('deviceorientationabsolute', handleOrientation);
+    } else {
+      window.addEventListener('deviceorientation', handleOrientation);
+    }
+    document.getElementById('btnCompass').style.display = 'none'; // Sembunyikan tombol
+  }
+}
+
+// Fungsi untuk memutar kompas sesuai pergerakan HP
+function handleOrientation(event) {
+  let heading = 0;
+  
+  // Baca derajat putaran dari sensor
+  if (event.webkitCompassHeading) {
+    // Format Apple / iOS
+    heading = event.webkitCompassHeading;
+  } else if (event.alpha !== null) {
+    // Format Android (konversi dari format berlawanan arah jarum jam)
+    heading = 360 - event.alpha;
+  } else {
+    return; // Sensor tidak terbaca
+  }
+
+  // Putar SELURUH cincin kompas beserta tulisan U-S-T-B agar Utara menunjuk ke arah sebenarnya.
+  // Karena struktur jarum (`.compass-needle`) ada di dalam `.compass-ring`, jarum akan otomatis ikut sejajar secara akurat ke arah kiblat!
+  const compassRing = document.querySelector('.compass-ring');
+  compassRing.style.transition = 'transform 0.1s ease-out';
+  compassRing.style.transform = `rotate(${-heading}deg)`;
+}
 function refreshLocation() {
   document.getElementById('locationText').textContent = 'Mendeteksi kota...';
   
