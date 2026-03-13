@@ -1,17 +1,19 @@
-// Service Worker — Waktu Sholat PWA v3 (Audio + Compass)
-const CACHE_NAME = 'waktu-sholat-v3';
+// Service Worker — Waktu Sholat PWA v4 (AlQuran + Multiple Azan)
+const CACHE_NAME = 'waktu-sholat-v4';
 const STATIC_ASSETS = [
   '/',
   '/index.html',
   '/manifest.json',
-  '/audio/azan.mp3',   // ← file MP3 yang diupload ke GitHub
+  '/audio/azan.mp3',
+  '/audio/azan1.mp3',   // ← Pilihan azan tambahan
+  '/audio/azan2.mp3',   // ← Pilihan azan tambahan
 ];
 
 self.addEventListener('install', event => {
   event.waitUntil(
     caches.open(CACHE_NAME)
       .then(cache => cache.addAll(
-        STATIC_ASSETS.filter(u => !u.endsWith('.mp3'))  // jangan cache MP3 saat install (opsional)
+        STATIC_ASSETS.filter(u => !u.endsWith('.mp3'))  // Jangan paksakan download mp3 saat instalasi agar proses install SW ringan
       ))
       .then(() => self.skipWaiting())
   );
@@ -47,11 +49,11 @@ self.addEventListener('fetch', event => {
     return;
   }
 
-  // 2. API — Network only (tidak di-cache)
-  if (url.hostname === 'api.aladhan.com' || url.hostname === 'nominatim.openstreetmap.org') {
+  // 2. API (Jadwal Sholat, Lokasi, AlQuran) — Network only (tidak di-cache)
+  if (url.hostname === 'api.aladhan.com' || url.hostname === 'nominatim.openstreetmap.org' || url.hostname === 'api.alquran.cloud') {
     event.respondWith(
       fetch(event.request).catch(() => new Response(
-        JSON.stringify({ error: 'offline' }),
+        JSON.stringify({ error: 'offline', code: 500 }),
         { headers: { 'Content-Type': 'application/json' } }
       ))
     );
